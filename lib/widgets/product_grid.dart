@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../pages/company_details_page.dart';
 
@@ -7,36 +8,13 @@ class ProductGrid extends StatelessWidget {
   final String? selectedCompanyId;
   final Function(String) onCompanySelected;
 
-  ProductGrid({
+  const ProductGrid({
     required this.products,
     required this.isLoading,
     required this.selectedCompanyId,
     required this.onCompanySelected,
+    super.key,
   });
-
-  final List<Color> cardColors = [
-    const Color(0xFF667eea),
-    const Color(0xFF764ba2),
-    const Color(0xFFf093fb),
-    const Color(0xFFf5576c),
-    const Color(0xFF4facfe),
-    const Color(0xFF00f2fe),
-    const Color(0xFF43e97b),
-    const Color(0xFF38f9d7),
-  ];
-
-  final List<IconData> productIcons = [
-    Icons.shopping_bag_rounded,
-    Icons.phone_iphone_rounded,
-    Icons.computer_rounded,
-    Icons.headset_rounded,
-    Icons.watch_rounded,
-    Icons.tablet_rounded,
-    Icons.tv_rounded,
-    Icons.camera_alt_rounded,
-  ];
-
-  Color getCardColor(int index) => cardColors[index % cardColors.length];
 
   @override
   Widget build(BuildContext context) {
@@ -51,17 +29,48 @@ class ProductGrid extends StatelessWidget {
               .toList();
 
     return GridView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         mainAxisSpacing: 16,
         crossAxisSpacing: 16,
-        childAspectRatio: 0.8,
+        childAspectRatio: 0.7,
       ),
       itemCount: filteredProducts.length,
       itemBuilder: (context, index) {
-        var product = filteredProducts[index];
-        final color = getCardColor(index);
+        final product = filteredProducts[index];
+        final name = product['name'] ?? 'منتج';
+        final price = product['price']?.toString() ?? '';
+        final imageData = product['path'];
+
+        Widget imageWidget;
+
+        // ✅ تحويل Base64 إلى صورة
+        if (imageData != null && imageData.toString().startsWith('iVBOR')) {
+          try {
+            final bytes = base64Decode(imageData);
+            imageWidget = Image.memory(
+              bytes,
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: 140,
+            );
+          } catch (e) {
+            imageWidget = _placeholderImage();
+          }
+        } else if (imageData != null &&
+            (imageData.toString().startsWith('http') ||
+                imageData.toString().startsWith('https'))) {
+          imageWidget = Image.network(
+            imageData,
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: 140,
+            errorBuilder: (context, error, stackTrace) => _placeholderImage(),
+          );
+        } else {
+          imageWidget = _placeholderImage();
+        }
 
         return GestureDetector(
           onTap: () {
@@ -75,40 +84,117 @@ class ProductGrid extends StatelessWidget {
             );
           },
           child: Card(
-            elevation: 4,
+            elevation: 6,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
             ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      color: color.withOpacity(0.1),
-                      shape: BoxShape.circle,
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ✅ صورة المنتج مع ظل
+                Container(
+                  height: 140,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black26,
+                        blurRadius: 6,
+                        offset: Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(20),
                     ),
-                    child: Icon(
-                      productIcons[index % productIcons.length],
-                      size: 30,
-                      color: color,
+                    child: imageWidget,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // اسم المنتج
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    product['name'] ?? 'منتج',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 4),
+                // السعر مع خلفية جذابة
+                if (price.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Colors.blue.shade700, Colors.blue.shade400],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '$price د.ع',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
                   ),
-                ],
-              ),
+                const Spacer(),
+                // زر عرض الشركة
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 6,
+                  ),
+                  child: Align(
+                    alignment: Alignment.bottomRight,
+                    child: TextButton.icon(
+                      onPressed: () {
+                        onCompanySelected(product['companyId'].toString());
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => CompanyDetailsPage(
+                              companyId: product['companyId'].toString(),
+                            ),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.store_rounded, size: 18),
+                      label: const Text('عرض الشركة'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.blue.shade700,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         );
       },
+    );
+  }
+
+  Widget _placeholderImage() {
+    return Container(
+      height: 140,
+      color: Colors.grey.shade200,
+      child: const Center(
+        child: Icon(Icons.image_not_supported, color: Colors.grey, size: 50),
+      ),
     );
   }
 }

@@ -139,6 +139,46 @@ class _CompanyDetailsPageState extends State<CompanyDetailsPage> {
     );
   }
 
+  Widget _buildImage(String? imageData, {double height = 140}) {
+    if (imageData == null) return _placeholderImage(height: height);
+
+    try {
+      if (imageData.startsWith('/9j') || imageData.startsWith('iVBORw0K')) {
+        final bytes = base64Decode(imageData);
+        return Image.memory(
+          bytes,
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: height,
+        );
+      } else if (imageData.startsWith('http') ||
+          imageData.startsWith('https')) {
+        return Image.network(
+          imageData,
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: height,
+          errorBuilder: (context, error, stackTrace) =>
+              _placeholderImage(height: height),
+        );
+      } else {
+        return _placeholderImage(height: height);
+      }
+    } catch (e) {
+      return _placeholderImage(height: height);
+    }
+  }
+
+  Widget _placeholderImage({double height = 140}) {
+    return Container(
+      height: height,
+      color: Colors.grey.shade200,
+      child: const Center(
+        child: Icon(Icons.image_not_supported, color: Colors.grey, size: 50),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -161,6 +201,7 @@ class _CompanyDetailsPageState extends State<CompanyDetailsPage> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
+            // معلومات الشركة
             if (isLoadingCompany)
               const Center(child: CircularProgressIndicator())
             else if (company == null)
@@ -183,25 +224,8 @@ class _CompanyDetailsPageState extends State<CompanyDetailsPage> {
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   children: [
-                    Container(
-                      width: 100,
-                      height: 100,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.white,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.blue.shade200,
-                            blurRadius: 12,
-                            offset: const Offset(0, 6),
-                          ),
-                        ],
-                      ),
-                      child: Icon(
-                        Icons.business_rounded,
-                        size: 50,
-                        color: Colors.blue.shade700,
-                      ),
+                    ClipOval(
+                      child: _buildImage(company!['companyLogo'], height: 100),
                     ),
                     const SizedBox(height: 16),
                     Text(
@@ -222,11 +246,33 @@ class _CompanyDetailsPageState extends State<CompanyDetailsPage> {
                         fontFamily: 'Cairo',
                       ),
                     ),
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        // هنا ممكن تضيف كود فتح رسالة أو رقم الهاتف
+                        // أو رابط تواصل
+                      },
+                      icon: const Icon(Icons.message_rounded),
+                      label: const Text(
+                        'تواصل مع الشركة',
+                        style: TextStyle(fontFamily: 'Cairo'),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue.shade700,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
               const SizedBox(height: 24),
-
               _buildInfoCard(
                 '📞 رقم الهاتف',
                 company!['companyPhone'] ?? 'غير متوفر',
@@ -257,71 +303,11 @@ class _CompanyDetailsPageState extends State<CompanyDetailsPage> {
                 Icons.calendar_today,
                 Colors.blue,
               ),
-
-              const SizedBox(height: 24),
-
-              Card(
-                elevation: 4,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.info_rounded, color: Colors.blue.shade700),
-                          const SizedBox(width: 10),
-                          Text(
-                            'معلومات الشركة',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              fontFamily: 'Cairo',
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        company!['companyInfo'] ?? 'لا توجد معلومات متاحة',
-                        style: const TextStyle(
-                          fontSize: 15,
-                          height: 1.6,
-                          fontFamily: 'Cairo',
-                          color: Colors.black87,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      ElevatedButton.icon(
-                        onPressed: () {},
-                        icon: const Icon(Icons.message_rounded),
-                        label: const Text(
-                          'تواصل مع الشركة',
-                          style: TextStyle(fontFamily: 'Cairo'),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue.shade700,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 12,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
             ],
 
             const SizedBox(height: 24),
 
+            // منتجات الشركة
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
@@ -352,7 +338,7 @@ class _CompanyDetailsPageState extends State<CompanyDetailsPage> {
                   crossAxisCount: 2,
                   mainAxisSpacing: 12,
                   crossAxisSpacing: 12,
-                  childAspectRatio: 0.8,
+                  childAspectRatio: 0.75,
                 ),
                 itemCount: products.length,
                 itemBuilder: (context, index) {
@@ -363,20 +349,41 @@ class _CompanyDetailsPageState extends State<CompanyDetailsPage> {
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Icon(
-                          Icons.inventory_2_rounded,
-                          size: 50,
-                          color: Colors.blue.shade700,
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(16),
+                            ),
+                            child: _buildImage(
+                              product['path'],
+                              height: double.infinity,
+                            ),
+                          ),
                         ),
-                        const SizedBox(height: 10),
-                        Text(
-                          product['name'] ?? 'اسم المنتج',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontFamily: 'Cairo',
-                            fontWeight: FontWeight.w600,
+                        Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: Column(
+                            children: [
+                              Text(
+                                product['name'] ?? 'اسم المنتج',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontFamily: 'Cairo',
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              if (product['price'] != null)
+                                Text(
+                                  '${product['price']} د.ع',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: Colors.blue.shade700,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
                       ],

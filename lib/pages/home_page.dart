@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../widgets/product_grid.dart';
-import 'companies_page.dart'; // الصفحة الجديدة المستقلة
+import 'companies_page.dart';
 import 'company_details_page.dart';
 
 class HomePage extends StatefulWidget {
@@ -12,8 +12,10 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   List products = [];
+  List ads = []; // ✅ قائمة الإعلانات
   String? selectedCompanyId;
   bool isLoadingProducts = true;
+  bool isLoadingAds = false; // ✅ حالة تحميل الإعلانات
   int _currentIndex = 0;
   TextEditingController searchController = TextEditingController();
   bool isSearching = false;
@@ -24,6 +26,7 @@ class _HomePageState extends State<HomePage> {
     fetchProducts();
   }
 
+  // ✅ دالة جلب المنتجات
   Future<void> fetchProducts() async {
     try {
       final url = Uri.parse('https://mfkapi.runasp.net/api/products');
@@ -42,6 +45,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  // ✅ دالة البحث
   Future<void> searchProducts(String query) async {
     if (query.isEmpty) {
       fetchProducts();
@@ -68,6 +72,27 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  // ✅ دالة جلب الإعلانات
+  Future<void> fetchAds() async {
+    setState(() => isLoadingAds = true);
+    try {
+      final url = Uri.parse('https://mfkapi.runasp.net/api/ads');
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        setState(() {
+          ads = data;
+          isLoadingAds = false;
+        });
+      } else {
+        setState(() => isLoadingAds = false);
+      }
+    } catch (e) {
+      setState(() => isLoadingAds = false);
+    }
+  }
+
+  // ✅ واجهة الصفحة
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -123,6 +148,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  // ✅ القائمة الجانبية
   Widget _buildDrawer() {
     return Drawer(
       child: Column(
@@ -190,6 +216,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  // ✅ عنصر القائمة الجانبية
   Widget _buildDrawerItem(
     IconData icon,
     String title,
@@ -230,12 +257,14 @@ class _HomePageState extends State<HomePage> {
         } else if (index >= 0) {
           setState(() {
             _currentIndex = index;
+            if (index == 3) fetchAds(); // ✅ عند فتح صفحة الإعلانات
           });
         }
       },
     );
   }
 
+  // ✅ تحديد الصفحة الحالية
   Widget _getBody() {
     switch (_currentIndex) {
       case 0:
@@ -258,11 +287,12 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  // ✅ صفحة المنتجات
   Widget _buildProductsPage() {
-    return Center(
+    return const Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
-        children: const [
+        children: [
           Icon(Icons.shopping_bag_rounded, size: 80, color: Colors.grey),
           SizedBox(height: 20),
           Text('صفحة المنتجات'),
@@ -273,21 +303,127 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  // ✅ صفحة الإعلانات (تعديل كامل)
   Widget _buildAdsPage() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: const [
-          Icon(Icons.campaign_rounded, size: 80, color: Colors.grey),
-          SizedBox(height: 20),
-          Text('صفحة الإعلانات'),
-          SizedBox(height: 10),
-          Text('سيتم إضافة المحتوى قريباً'),
-        ],
+    if (isLoadingAds) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (ads.isEmpty) {
+      return const Center(child: Text('لا توجد إعلانات حالياً'));
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(12),
+      itemCount: ads.length,
+      itemBuilder: (context, index) {
+        final ad = ads[index];
+        final String? path = ad['path'];
+        Widget imageWidget;
+
+        if (path != null && path.startsWith('iVBOR')) {
+          try {
+            final imageBytes = base64Decode(path);
+            imageWidget = Image.memory(
+              imageBytes,
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: 200,
+            );
+          } catch (e) {
+            imageWidget = _buildPlaceholderImage();
+          }
+        } else if (path != null &&
+            (path.startsWith('http') || path.startsWith('https'))) {
+          imageWidget = Image.network(
+            path,
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: 200,
+            errorBuilder: (context, error, stackTrace) =>
+                _buildPlaceholderImage(),
+          );
+        } else {
+          imageWidget = _buildPlaceholderImage();
+        }
+
+        return Card(
+          elevation: 4,
+          margin: const EdgeInsets.symmetric(vertical: 8),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(16),
+                ),
+                child: imageWidget,
+              ),
+              Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      ad['name'] ?? 'بدون اسم',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      ad['desc'] ?? '',
+                      style: const TextStyle(color: Colors.black54),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'من: ${ad['createDate'] ?? ''}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
+                        ),
+                        Text(
+                          'إلى: ${ad['expireDate'] ?? ''}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // ✅ صورة افتراضية في حال غياب الصورة
+  Widget _buildPlaceholderImage() {
+    return Container(
+      height: 200,
+      decoration: BoxDecoration(
+        color: Colors.grey.shade200,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      child: const Center(
+        child: Icon(Icons.image_not_supported, size: 60, color: Colors.grey),
       ),
     );
   }
 
+  // ✅ شريط التنقل السفلي
   Widget _buildBottomNavBar() {
     return BottomNavigationBar(
       currentIndex: _currentIndex,
@@ -298,7 +434,10 @@ class _HomePageState extends State<HomePage> {
             MaterialPageRoute(builder: (context) => CompaniesPage()),
           );
         } else {
-          setState(() => _currentIndex = index);
+          setState(() {
+            _currentIndex = index;
+            if (index == 3) fetchAds(); // ✅ عند فتح تبويب الإعلانات
+          });
         }
       },
       selectedItemColor: Colors.blue.shade700,
